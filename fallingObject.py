@@ -36,15 +36,12 @@ class FallingObject(pg.sprite.Sprite):
 
 class Ball(FallingObject):
     def __init__(self, initial_position:Vector2, initial_velocity:Vector2, radius:float, mass:float, color: Tuple[int, int,int]):
-        # radius in meters
+        # radius - meters
         # mass > 0
-        super().__init__(initial_position, initial_velocity,2*radius * PIXELS_PER_METER, math.pi * radius*radius * 0.5, mass)
+        super().__init__(initial_position, initial_velocity,2*radius, math.pi * radius*radius * 0.5, mass)
         self.radius = radius
         self.color = color
     def render(self, screen: SurfaceType):
         height = screen.get_rect().height
-        try:
-            pg.draw.circle(screen, self.color, (int(self.position.x*PIXELS_PER_METER), height - int(self.position.y*PIXELS_PER_METER)), int(self.radius*PIXELS_PER_METER))
-        except Exception:
-            breakpoint()
+        pg.draw.circle(screen, self.color, (int(self.position.x*PIXELS_PER_METER), height - int(self.position.y*PIXELS_PER_METER)), int(self.radius*PIXELS_PER_METER))
         return True

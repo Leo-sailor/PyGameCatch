@@ -1,22 +1,25 @@
 import pygame as pg
 from pygame import SurfaceType
+from fallingObject import FallingObject, PIXELS_PER_METER
 
-from fallingObject import FallingObject
+
 class Basket():
     def __init__(self, width: int, height: int, screen_width: int):
         self.width = width
         self.height = height
-        self.left_coord = (screen_width-width/2)
-        self.left_limit = 0
+        self.left_coord = ((screen_width-width)/2)
+        self.left_limit = 50
         self.right_limit = screen_width - width
     def __add__(self, other):
-        if isinstance(other,int):
-            self.left_coord += other
+        if isinstance(other,int) or isinstance(other,float):
+            self.left_coord = round(self.left_coord + other)
             self.limit_space()
+            return self
     def __sub__(self, other):
-        if isinstance(other,int):
-            self.left_coord -= other
+        if isinstance(other,int) or isinstance(other,float):
+            self.left_coord = round(self.left_coord - other)
             self.limit_space()
+            return self
     def render(self,screen: SurfaceType):
         r = pg.rect.Rect(self.left_coord,screen.get_rect().height - self.height,self.width,self.height)
         pg.draw.rect(screen, (0, 0, 0), r)
@@ -30,7 +33,7 @@ class Basket():
     def is_caught(self, item: FallingObject):
         if item.position.y > 0.2:
             return False
-        if self.left_coord <= item.position.x <= self.left_coord+ self.width:
+        if self.left_coord <= item.position.x * PIXELS_PER_METER <= self.left_coord+ self.width:
             return True
         else:
             return False

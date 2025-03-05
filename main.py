@@ -1,14 +1,17 @@
 from random import randrange
 
 import pygame as pg
-from pygame.gfxdraw import pixel
-from pygame.locals import *
+from pygame.locals import RESIZABLE
 
 from baseClasses import Vector2
 from basket import Basket
 from fallingObject import Ball, PIXELS_PER_METER
 import os
 import time
+
+QUIT = "Press Escape to Quit"
+
+
 def load_image(file):
     #loads an image and prepares it
     main_dir = os.path.split(os.path.abspath(__file__))[0]
@@ -19,17 +22,13 @@ def load_image(file):
         raise SystemExit(f'Could not load image "{file}" {pg.get_error()}')
     return surface.convert()
 pg.init()
-
-def draw_score(score):
+def display_game_text(current_score, lives_remaining):
     font = pg.font.SysFont("Arial", 36)
-    score_text = font.render(f"Score: {score}", True, (0,0,255))
-    screen.blit(score_text, (10, 10))
-
-
+    text = font.render(f"Current score: {current_score} Lives Remaining: {lives_remaining}", 1, (255, 255, 255))
+    screen.blit(text, (10, 10))
 # 0 - main menu, 1 playing, 2 end screen 4 quit, 5 - pause
 GAMESTATE = 0
 
-pg.init()
 # display nonsense
 fullscreen = False
 scale_factor = 80
@@ -60,6 +59,10 @@ with open(file,"r") as f:
 
 score = 0
 catcher = Basket(int(SCREENRECT.width/10),int(SCREENRECT.height/20), SCREENRECT.width)
+d_t = 0
+lives = 3
+last_ball_time = time.time_ns()
+center = Vector2(screen.get_rect().width/2,screen.get_rect().height/2)
 while GAMESTATE != 4:
     for event in pg.event.get():
         if event.type == pg.QUIT:
@@ -68,52 +71,72 @@ while GAMESTATE != 4:
             SCREENRECT = pg.Rect(0, 0, event.w, event.h)
             background = pg.transform.scale(bgdtile, SCREENRECT.size)
             catcher.update_screen(SCREENRECT.width)
+            center = Vector2(screen.get_rect().width / 2, screen.get_rect().height / 2)
         if event.type == pg.KEYDOWN:
-            if event.key == pg.K_SPACE and GAMESTATE == 1:
-                ball = Ball(Vector2(0, 0), Vector2(randrange(3, 14), randrange(12, 25)), 1, 5, (255, 0, 0))
-                while not ball.check_landing(screen.get_rect().width):
-                    ball = Ball(Vector2(0, 0), Vector2(randrange(3, 14), randrange(12, 25)), 1, 5, (255, 0, 0))
-                balls.append(ball)
-                print("ball added")
             if event.key == pg.K_RETURN:
                 if GAMESTATE in[0,3]:
                     GAMESTATE = 1
                     force_dt = True
+                    last_ball_time = time.time_ns()
                     score = 0
+                    lives = 3
                     balls = []
                 if GAMESTATE == 5:
                     GAMESTATE = 1
+                    last_ball_time = time.time_ns()
                     force_dt = True
             if event.key == pg.K_ESCAPE:
                 if GAMESTATE == 1:
+                    print("paused")
                     GAMESTATE = 5
-                if GAMESTATE in [3,0]:
+                elif GAMESTATE in [3,0,5]:
+                    print("quitting")
+                    if score > max_score:
+                        max_score = score
                     GAMESTATE =  4
-            if event.key == pg.K_LEFT and GAMESTATE == 1:
-                catcher -= d_t * PIXELS_PER_METER * 10
-            if event.key == pg.K_RIGHT and GAMESTATE == 1:
-                catcher += d_t * PIXELS_PER_METER * 10
 
     screen.fill((255,255,255))
     screen.blit(background, (0, 0))
     if GAMESTATE == 1:
+        interval = 2 - (score * 0.019)
+        now = time.time_ns()
+        if (now-last_ball_time) *(10**-9) > interval:
+            ball = Ball(Vector2(0, 0), Vector2(randrange(3, 14), randrange(12, 25)), 1, 5, (255, 0, 0))
+            while not ball.check_landing(screen.get_rect().width):
+                ball = Ball(Vector2(0, 0), Vector2(randrange(3, 14), randrange(12, 25)), 1, 5, (255, 0, 0))
+            balls.append(ball)
+            last_ball_time = now
+
         d_t = (time.time_ns() - last_time) * 10 **-9
         if force_dt:
             d_t = 0.01
             force_dt = False
         last_time = time.time_ns()
-        to_remove = []
+        keys = pg.key.get_pressed()
+        if keys[pg.K_LEFT] or keys[pg.K_a]:
+            catcher -= (d_t * PIXELS_PER_METER * 10)
+        if keys[pg.K_RIGHT]or keys[pg.K_d]:
+            catcher += (d_t * PIXELS_PER_METER * 10)
+        display_game_text(score,lives)
+        to_remove = set()
         for i,ball in enumerate(balls):
             ball.render(screen)
             if catcher.is_caught(ball):
                 score += 1
+                print("ball Caught")
+                to_remove.add(i)
             if not ball.update(d_t):
-                to_remove.append(i)
-        for i in reversed(to_remove):
+                to_remove.add(i)
+                lives -= 1
+                print("ball removed")
+        to_remove_list = list(to_remove)
+        to_remove_list.sort(reverse=True)
+        for i in to_remove_list:
             balls.pop(i)
         catcher.render(screen)
+        if lives<=1:
+            GAMESTATE = 3
     elif GAMESTATE == 0:
-        center = Vector2(screen.get_rect().width/2,screen.get_rect().height/2)
         r = pg.rect.Rect(*(center/2).tup(),*center.tup())
         pg.draw.rect(screen,(0,0,255),r)
         font = pg.font.SysFont("Arial", 36)
@@ -124,16 +147,63 @@ while GAMESTATE != 4:
         text = font.render("Max Score: "+ str(max_score), True, (0, 0, 0))
         text.get_rect()
         screen.blit(text, (center + (-text.get_rect().width / 2, -center.y / 4)).tup())
+        font = pg.font.SysFont("Arial", 20)
+        text = font.render("Aim: catch as many red balls in the black container as possible", True, (0, 0, 0))
+        text.get_rect()
+        screen.blit(text, (center + (-text.get_rect().width / 2, (-center.y / 4) + 25)).tup())
+        font = pg.font.SysFont("Arial", 20)
+        text = font.render("Controls: Use left and right arrow keys to move the container", True, (0, 0, 0))
+        text.get_rect()
+        screen.blit(text, (center + (-text.get_rect().width / 2, (-center.y / 4) + 50)).tup())
         font = pg.font.SysFont("Arial", 36)
         text = font.render("Press Enter to Start", True, (0, 0, 0))
         text.get_rect()
         screen.blit(text, (center + (-text.get_rect().width / 2 - center.x/4, center.y / 2.8)).tup())
-        text = font.render("Press Escape to Quit", True, (0, 0, 0))
+        text = font.render(QUIT, True, (0, 0, 0))
+        text.get_rect()
+        screen.blit(text, (center + (-text.get_rect().width / 2 + center.x / 4, center.y / 2.8)).tup())
+    elif GAMESTATE == 3:
+        if score > max_score:
+            max_score = score
+        r = pg.rect.Rect(*(center/2).tup(),*center.tup())
+        pg.draw.rect(screen,(0,0,255),r)
+        font = pg.font.SysFont("Arial", 50)
+        text = font.render("Game Over!", True, (0, 0, 0))
+        text.get_rect()
+        screen.blit(text,(center+(-text.get_rect().width/2,-center.y/2.2)).tup())
+        font = pg.font.SysFont("Arial", 20)
+        text = font.render("Max Score: "+ str(max_score) + "    Your Score: " + str(score), True, (0, 0, 0))
+        text.get_rect()
+        screen.blit(text, (center + (-text.get_rect().width / 2, -center.y / 4.5)).tup())
+        font = pg.font.SysFont("Arial", 36)
+        text = font.render("Press Enter to Restart", True, (0, 0, 0))
+        text.get_rect()
+        screen.blit(text, (center + (-text.get_rect().width / 2 - center.x/4, center.y / 2.8)).tup())
+        text = font.render(QUIT, True, (0, 0, 0))
+        text.get_rect()
+        screen.blit(text, (center + (-text.get_rect().width / 2 + center.x / 4, center.y / 2.8)).tup())
+    elif GAMESTATE ==5:
+        r = pg.rect.Rect(*(center / 2).tup(), *center.tup())
+        pg.draw.rect(screen, (0, 0, 255), r)
+        font = pg.font.SysFont("Arial", 50)
+        text = font.render("Game Paused!", True, (0, 0, 0))
+        text.get_rect()
+        screen.blit(text, (center + (-text.get_rect().width / 2, -center.y / 2.2)).tup())
+        font = pg.font.SysFont("Arial", 20)
+        text = font.render("Max Score: " + str(max_score) + "    Your Current Score: " + str(score), True, (0, 0, 0))
+        text.get_rect()
+        screen.blit(text, (center + (-text.get_rect().width / 2, -center.y / 4.5)).tup())
+        font = pg.font.SysFont("Arial", 36)
+        text = font.render("Press Enter to Resume", True, (0, 0, 0))
+        text.get_rect()
+        screen.blit(text, (center + (-text.get_rect().width / 2 - center.x / 4, center.y / 2.8)).tup())
+        text = font.render(QUIT, True, (0, 0, 0))
         text.get_rect()
         screen.blit(text, (center + (-text.get_rect().width / 2 + center.x / 4, center.y / 2.8)).tup())
 
     pg.display.flip()
 
-
+with open(file,"a") as f:
+    f.writelines(["\n" +str(max_score)])
 
 pg.quit()
