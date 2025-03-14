@@ -1,13 +1,12 @@
 from random import randrange
-
 import pygame as pg
 from pygame.locals import RESIZABLE
-
 from baseClasses import Vector2
 from basket import Basket
 from fallingObject import Ball, PIXELS_PER_METER
 import os
 import time
+
 
 QUIT = "Press Escape to Quit"
 
@@ -23,16 +22,17 @@ def load_image(file):
     return surface.convert()
 pg.init()
 def display_game_text(current_score, lives_remaining):
+    """Display the text of the game onto the screen"""
     font = pg.font.SysFont("Arial", 36)
     text = font.render(f"Current score: {current_score} Lives Remaining: {lives_remaining}", 1, (255, 255, 255))
     screen.blit(text, (10, 10))
 # 0 - main menu, 1 playing, 2 end screen 4 quit, 5 - pause
-GAMESTATE = 0
+gamestate = 0
 
-# display nonsense
+# display waffle (just about works
 fullscreen = False
 scale_factor = 80
-SCREENRECT = pg.Rect(0, 0,16*scale_factor, 9*scale_factor)
+SCREENRECT = pg.Rect(0, 0, 16 * scale_factor, 9 * scale_factor)
 winstyle = RESIZABLE
 bestdepth = pg.display.mode_ok(SCREENRECT.size, winstyle, 32)
 screen = pg.display.set_mode(SCREENRECT.size, winstyle, bestdepth)
@@ -45,10 +45,7 @@ background = pg.transform.scale(bgdtile, SCREENRECT.size)
 screen.blit(background, (0, 0))
 pg.display.flip()
 
-force_dt = False
-balls =[]
-last_time = time.time_ns()
-
+# finds the all time max score from the file
 main_dir = os.path.split(os.path.abspath(__file__))[0]
 file = os.path.join(main_dir, "score.txt")
 with open(file,"r") as f:
@@ -57,51 +54,57 @@ with open(file,"r") as f:
         if float(line) > max_score:
             max_score = float(line)
 
+# initialize the variables ready for the game loop
+force_dt = False
+balls =[]
+last_time = time.time_ns()
 score = 0
-catcher = Basket(int(SCREENRECT.width/10),int(SCREENRECT.height/20), SCREENRECT.width)
+CATCHER = Basket(int(SCREENRECT.width / 10), int(SCREENRECT.height / 20), SCREENRECT.width)
 d_t = 0
-lives = 3
+lives = 5
 last_ball_time = time.time_ns()
-center = Vector2(screen.get_rect().width/2,screen.get_rect().height/2)
-while GAMESTATE != 4:
+center = Vector2(screen.get_rect().width/2,screen.get_rect().height/2) # creates vecotr for the center of the screen
+
+while gamestate != 4:
     for event in pg.event.get():
         if event.type == pg.QUIT:
-            GAMESTATE = 4
+            gamestate = 4
         if event.type == pg.VIDEORESIZE:
             SCREENRECT = pg.Rect(0, 0, event.w, event.h)
             background = pg.transform.scale(bgdtile, SCREENRECT.size)
-            catcher.update_screen(SCREENRECT.width)
+            CATCHER.update_screen(SCREENRECT.width)
             center = Vector2(screen.get_rect().width / 2, screen.get_rect().height / 2)
         if event.type == pg.KEYDOWN:
             if event.key == pg.K_RETURN:
-                if GAMESTATE in[0,3]:
-                    GAMESTATE = 1
+                if gamestate in[0, 3]:
+                    gamestate = 1
                     force_dt = True
                     last_ball_time = time.time_ns()
                     score = 0
-                    lives = 3
+                    lives = 5
                     balls = []
-                if GAMESTATE == 5:
-                    GAMESTATE = 1
+                if gamestate == 5:
+                    gamestate = 1
                     last_ball_time = time.time_ns()
                     force_dt = True
             if event.key == pg.K_ESCAPE:
-                if GAMESTATE == 1:
+                if gamestate == 1:
                     print("paused")
-                    GAMESTATE = 5
-                elif GAMESTATE in [3,0,5]:
+                    gamestate = 5
+                elif gamestate in [3, 0, 5]:
                     print("quitting")
                     if score > max_score:
                         max_score = score
-                    GAMESTATE =  4
+                    gamestate =  4
 
     screen.fill((255,255,255))
     screen.blit(background, (0, 0))
-    if GAMESTATE == 1:
+    if gamestate == 1:
         interval = 2 - (score * 0.019)
         now = time.time_ns()
         if (now-last_ball_time) *(10**-9) > interval:
-            ball = Ball(Vector2(0, 0), Vector2(randrange(3, 14), randrange(12, 25)), 1, 5, (255, 0, 0))
+            ball = Ball(Vector2(0, 0), Vector2(randrange(3, 14), randrange(12, 25)),
+                        1, 5, (255, 0, 0))
             while not ball.check_landing(screen.get_rect().width):
                 ball = Ball(Vector2(0, 0), Vector2(randrange(3, 14), randrange(12, 25)), 1, 5, (255, 0, 0))
             balls.append(ball)
@@ -114,14 +117,14 @@ while GAMESTATE != 4:
         last_time = time.time_ns()
         keys = pg.key.get_pressed()
         if keys[pg.K_LEFT] or keys[pg.K_a]:
-            catcher -= (d_t * PIXELS_PER_METER * 10)
+            CATCHER -= (d_t * PIXELS_PER_METER * 10)
         if keys[pg.K_RIGHT]or keys[pg.K_d]:
-            catcher += (d_t * PIXELS_PER_METER * 10)
+            CATCHER += (d_t * PIXELS_PER_METER * 10)
         display_game_text(score,lives)
         to_remove = set()
         for i,ball in enumerate(balls):
             ball.render(screen)
-            if catcher.is_caught(ball):
+            if CATCHER.is_caught(ball):
                 score += 1
                 print("ball Caught")
                 to_remove.add(i)
@@ -133,10 +136,10 @@ while GAMESTATE != 4:
         to_remove_list.sort(reverse=True)
         for i in to_remove_list:
             balls.pop(i)
-        catcher.render(screen)
+        CATCHER.render(screen)
         if lives<=1:
-            GAMESTATE = 3
-    elif GAMESTATE == 0:
+            gamestate = 3
+    elif gamestate == 0:
         r = pg.rect.Rect(*(center/2).tup(),*center.tup())
         pg.draw.rect(screen,(0,0,255),r)
         font = pg.font.SysFont("Arial", 36)
@@ -162,7 +165,7 @@ while GAMESTATE != 4:
         text = font.render(QUIT, True, (0, 0, 0))
         text.get_rect()
         screen.blit(text, (center + (-text.get_rect().width / 2 + center.x / 4, center.y / 2.8)).tup())
-    elif GAMESTATE == 3:
+    elif gamestate == 3:
         if score > max_score:
             max_score = score
         r = pg.rect.Rect(*(center/2).tup(),*center.tup())
@@ -182,7 +185,7 @@ while GAMESTATE != 4:
         text = font.render(QUIT, True, (0, 0, 0))
         text.get_rect()
         screen.blit(text, (center + (-text.get_rect().width / 2 + center.x / 4, center.y / 2.8)).tup())
-    elif GAMESTATE ==5:
+    elif gamestate ==5:
         r = pg.rect.Rect(*(center / 2).tup(), *center.tup())
         pg.draw.rect(screen, (0, 0, 255), r)
         font = pg.font.SysFont("Arial", 50)
